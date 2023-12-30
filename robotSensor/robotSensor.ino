@@ -1,9 +1,15 @@
 #include <Servo.h>
 #include <SoftwareSerial.h>
 #include <time.h>
+#include <IRremote.h>
 
 Servo myservo;
 SoftwareSerial BTserial(8, 9);  // RX | TX
+
+long ir_rec;
+
+IRrecv irrecv(3);
+decode_results results;
 
 time_t now;
 volatile int DL;
@@ -15,8 +21,10 @@ int outputDelay = 13;
 int inputServo = 10;
 
 int currentkeyboard = 0;
-int controlSpeed = 90;
-boolean currentkeyboardFlag = false;
+int controlSpeed = 100;
+bool flag = true;
+bool currentkeyboardFlag = false;
+long currentRemote = 0;
 
 void setup() {
   DL = 0;
@@ -33,6 +41,8 @@ void setup() {
   myservo.attach(inputServo);
   myservo.write(90);
 
+  irrecv.enableIRIn();
+
   Serial.begin(9600);
 }
 
@@ -44,13 +54,16 @@ void loop() {
     currentkeyboardFlag = false;
   } else {
     if (!currentkeyboardFlag) {
-      controlByKeyboard();
+      controlByRemote();
     }
   }
 
-  if (Serial.available()) {
-    controlByKeyboard();
+  if (irrecv.decode(&results)) {
+    controlByRemote();
   }
+  // if (Serial.available()) {
+  //   controlByKeyboard();
+  // }
 }
 
 float UltrasonicSensor() {
@@ -61,8 +74,8 @@ float UltrasonicSensor() {
   delayMicroseconds(10);
   digitalWrite(inputDelay, LOW);
   float distance = pulseIn(outputDelay, HIGH) / 58.00;
-  Serial.print(DM);
-  Serial.println("cm");
+  // Serial.print(DM);
+  // Serial.println("cm");
   delay(1000);
   return distance;
 }
@@ -109,61 +122,132 @@ void controlByKeyboard() {
       // FORWARD =================
     case 56:
       Serial.println("forward");
-      forward(controlSpeed, controlSpeed);
+      forward();
       break;
       // FORWARD =================
 
       // BACKWARD =================
     case 50:
       Serial.println("backward");
-      backward(controlSpeed, controlSpeed);
+      backward();
       break;
       // BACKWARD =================
 
       // ROTATELEFT =================
     case 52:
       Serial.println("rotateLeft");
-      rotateLeft(controlSpeed, controlSpeed);
+      rotate_left();
       break;
       // ROTATELEFT =================
 
       // ROTATERIGHT =================
     case 54:
       Serial.println("rotateRight");
-      rotateRight(controlSpeed, controlSpeed);
+      rotate_right();
       break;
       // ROTATERIGHT =================
   }
   // }
 }
 
-void forward(int a, int b) {
+void controlByRemote() {
+  // Serial.println("controlByRemote : function");
+  ir_rec = currentRemote;
+  if (irrecv.decode(&results)) {
+    currentkeyboardFlag = true;
+    ir_rec = results.value;
+    Serial.println(String(ir_rec));
+    currentRemote = ir_rec;
+    irrecv.resume();
+  }
+
+
+
+  if (flag == true) {
+    if (ir_rec == 0xFF629D) {
+      forward();
+      Serial.println("forward");
+    }
+    if (ir_rec == 0xFFA857) {
+      backward();
+      Serial.println("backward");
+    }
+    if (ir_rec == 0xFF22DD) {
+      turn_left();
+      Serial.println("turn_left");
+    }
+    if (ir_rec == 0xFFC23D) {
+      turn_right();
+      Serial.println("turn_right");
+    }
+    if (ir_rec == 0xFF30CF) {
+      rotate_left();
+      Serial.println("rotate_left");
+    }
+    if (ir_rec == 0xFF7A85) {
+      rotate_right();
+      Serial.println("rotate_right");
+    }
+    if (ir_rec == 0xFF02FD) {
+      stopp();
+      Serial.println("stopp");
+    }
+  }
+}
+
+void forward() {
+  flag = false;
   digitalWrite(2, LOW);
-  analogWrite(5, a);
+  analogWrite(5, 200);
   digitalWrite(4, HIGH);
-  analogWrite(6, b);
+  analogWrite(6, 200);
+  flag = true;
 }
 
-void backward(int a, int b) {
+void backward() {
+  flag = false;
   digitalWrite(2, HIGH);
-  analogWrite(5, a);
+  analogWrite(5, 200);
   digitalWrite(4, LOW);
-  analogWrite(6, b);
+  analogWrite(6, 200);
+  flag = true;
 }
 
-void rotateRight(int a, int b) {
-  digitalWrite(2, HIGH);
-  analogWrite(5, a);
-  digitalWrite(4, HIGH);
-  analogWrite(6, b);
-}
-
-void rotateLeft(int a, int b) {
+void turn_left() {
+  flag = false;
   digitalWrite(2, LOW);
-  analogWrite(5, a);
-  digitalWrite(4, LOW);
-  analogWrite(6, b);
+  analogWrite(5, 200);
+  digitalWrite(4, HIGH);
+  analogWrite(6, 100);
+  flag = true;
 }
+
+void turn_right() {
+  flag = false;
+  digitalWrite(2, LOW);
+  analogWrite(5, 100);
+  digitalWrite(4, HIGH);
+  analogWrite(6, 200);
+  flag = true;
+}
+void rotate_left() {
+  flag = false;
+  digitalWrite(2, HIGH);
+  analogWrite(5, 200);
+  digitalWrite(4, HIGH);
+  analogWrite(6, 200);
+  flag = true;
+}
+
+
+void rotate_right() {
+  digitalWrite(2, LOW);
+  analogWrite(5, 200);
+  digitalWrite(4, LOW);
+  analogWrite(6, 200);
+}
+
+
 
 void stopp() {
   digitalWrite(2, HIGH);
